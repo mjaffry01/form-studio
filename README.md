@@ -41,7 +41,7 @@ A browser-based form designer with rich text, pasted/uploaded images, Word and P
 
 Open `Form-Studio.html` in Chrome, Edge, or Firefox. No installation, account, server, or internet connection is required for the downloaded app.
 
-1. **Design:** start with the example or click New form. Add fields from the left panel. Each input automatically gets a label. Click a field to edit its label, help text, placeholder, required setting, or dropdown options. Use the arrows to reorder fields, the copy icon to duplicate, and × to delete.
+1. **Design:** the app opens with an empty form. Set the title and description in Form settings above the canvas, then add fields. Click New form whenever you want to start again. Add fields from the left panel. Each input automatically gets a label. Click a field to edit its label, help text, placeholder, required setting, or dropdown options. Use the arrows to reorder fields, the copy icon to duplicate, and × to delete.
 2. **Save design:** downloads a `.form.json` file. Use Open design to continue editing it later.
 3. **Fill in:** enter answers. In Text + images fields, use bold, italic, underline, lists, image upload, or paste a copied image. Click an image and select × Image to remove it.
 4. **Save draft:** downloads a `.draft.json` containing the design, answers, and embedded images. Open draft restores it. Save before closing the tab; responses are not automatically saved.

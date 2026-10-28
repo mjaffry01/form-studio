@@ -10,6 +10,7 @@ w.eval(fs.readFileSync('node_modules/dompurify/dist/purify.js','utf8'));w.eval(f
 const api=w.FormStudio,$=s=>w.document.querySelector(s),click=s=>{assert.ok($(s),'Missing '+s);$(s).click();},input=(s,v)=>{$(s).value=v;$(s).dispatchEvent(new w.Event('input',{bubbles:true}));},change=(s,v)=>{$(s).value=v;$(s).dispatchEvent(new w.Event('change',{bubbles:true}));};
 const pause=()=>new Promise(r=>setTimeout(r,80));
 async function main(){
+assert.equal(api.getState().schema.fields.length,0);assert.equal(api.getState().schema.description,'');assert.ok($('.form-settings').compareDocumentPosition($('.workspace')) & w.Node.DOCUMENT_POSITION_FOLLOWING);input('[data-schema="title"]','Project brief');click('[data-add="text"]');$('[data-prop="required"]').checked=true;$('[data-prop="required"]').dispatchEvent(new w.Event('change'));for(const type of ['rich','yesno','date','submit'])click('[data-add="'+type+'"]');
 assert.equal(api.getState().schema.fields.length,5);click('[data-mode="fill"]');click('[data-mode="export"]');assert.equal(api.getState().mode,'fill');assert.match($('.error-text').textContent,/complete/);
 const textId=api.getState().schema.fields.find(f=>f.type==='text').id;input('[data-answer="'+textId+'"]','Website refresh');
 const richId=api.getState().schema.fields.find(f=>f.type==='rich').id;
