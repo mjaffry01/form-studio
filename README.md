@@ -54,7 +54,7 @@ Open `Form-Studio.html` in Chrome, Edge, or Firefox. No installation, account, s
 
 Upload the generated form's `index.html` to any static web host. All styles, fonts, scripts, and export libraries are embedded in the HTML file. The builder itself can also be hosted as an HTML page.
 
-Submit means validate and review for document export. This version does not collect responses on a server or email them to a form owner. Downloads contain the entered information, so share them intentionally. A downloaded form is editable HTML, not a tamper-proof assessment system.
+Submit means validate and review for document export. The offline version keeps responses in the browser. On the hosted app, Save to library explicitly stores a private online copy for MCP access. Neither version emails responses. Downloads contain the entered information, so share them intentionally. A downloaded form is editable HTML, not a tamper-proof assessment system.
 
 ## Practical limits
 
@@ -71,4 +71,4 @@ Submit means validate and review for document export. This version does not coll
 
 Install Node.js, run `npm ci`, then `npm run build`. `npm start` serves the app at `http://127.0.0.1:4173`. `npm test` checks the main editing workflow, required validation, draft restoration, sanitization, standalone packaging, and image-containing Word/PDF generation. The generated app is `dist/index.html`.
 
-Dependencies are pinned in `package-lock.json`. Third-party license notices are distributed with the offline package. The application has no analytics, runtime network calls, or response database.
+Dependencies are pinned in `package-lock.json`. Third-party license notices are distributed with the offline package. The offline application has no analytics or runtime network calls. The hosted MCP library uses authenticated requests and private server storage.
