@@ -1,0 +1,2 @@
+const http=require('http'),fs=require('fs'),path=require('path');
+const root=path.resolve('dist');http.createServer((req,res)=>{let f=path.resolve(root,'.'+decodeURIComponent(req.url.split('?')[0]));if(f===root)f=path.join(root,'index.html');if(!f.startsWith(root+path.sep)){res.writeHead(403);res.end();return;}fs.readFile(f,(e,b)=>{res.writeHead(e?404:200,{'Content-Type':f.endsWith('.html')?'text/html; charset=utf-8':'application/octet-stream'});res.end(e?'Not found':b);});}).listen(4173,'127.0.0.1',()=>console.log('Local: http://127.0.0.1:4173'));

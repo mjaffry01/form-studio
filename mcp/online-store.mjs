@@ -1,0 +1,11 @@
+import { artifactId } from './schema.mjs';
+export class OnlineStore {
+ constructor(bucket,prefix,origin){this.bucket=bucket;this.prefix=prefix;this.origin=origin;}
+ static async create(bucket,user,origin){if(!bucket)throw new Error('Online storage is not configured.');const hash=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(user))),key=Array.from(hash,b=>b.toString(16).padStart(2,'0')).join('');return new OnlineStore(bucket,'users/'+key+'/',origin);}
+ recordLink(record){return {download_url:this.origin+'/api/files/'+record.id,view_url:this.origin+'/?mcp_artifact='+record.id};}
+ async putRecord(record){await this.bucket.put(this.prefix+'records/'+record.id+'.json',JSON.stringify(record.document),{httpMetadata:{contentType:'application/json'},customMetadata:{id:record.id,kind:record.kind,title:record.document.schema.title.slice(0,150),created_at:record.created_at,parent_id:record.parent_id||''}});}
+ async getRecord(id){const obj=await this.bucket.get(this.prefix+'records/'+artifactId.parse(id)+'.json');if(!obj)throw new Error('Artifact not found in your online library.');return {...obj.customMetadata,id,document:JSON.parse(await obj.text())};}
+ async list({kind='all',cursor,limit=30}){const r=await this.bucket.list({prefix:this.prefix+'records/',limit,cursor,include:['customMetadata']});return {items:r.objects.filter(o=>kind==='all'||o.customMetadata.kind===kind).map(o=>({...o.customMetadata,...this.recordLink(o.customMetadata)})),next_cursor:r.truncated?r.cursor:null};}
+ async putExport({id,name,mime,bytes,source_id}){await this.bucket.put(this.prefix+'exports/'+id,bytes,{httpMetadata:{contentType:mime},customMetadata:{name,mime,source_id}});return {artifact_id:id,source_id,name,mime_type:mime,size_bytes:bytes.length,download_url:this.origin+'/api/files/'+id};}
+ async file(id){artifactId.parse(id);const record=await this.bucket.get(this.prefix+'records/'+id+'.json');if(record)return {body:record.body,mime:'application/json',name:id+'.'+(record.customMetadata.kind==='draft'?'draft':'form')+'.json'};const file=await this.bucket.get(this.prefix+'exports/'+id);return file?{body:file.body,mime:file.customMetadata.mime,name:file.customMetadata.name}:null;}
+}

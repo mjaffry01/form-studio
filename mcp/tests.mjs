@@ -1,0 +1,44 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import JSZip from 'jszip';
+import { Client } from '@modelcontextprotocol/client';
+import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
+import { createService } from './service.mjs';
+import { LocalStore } from './local-store.mjs';
+import { cleanRich,imageData } from './content.mjs';
+const root=path.resolve('test-results/mcp-'+crypto.randomUUID());await fs.mkdir(root,{recursive:true});
+const template=await fs.readFile('dist/index.html','utf8');
+const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aKp8AAAAASUVORK5CYII=';
+const store=await new LocalStore(root).init(),service=createService(store,template);
+const create=()=>service.call('create_form',{title:'MCP project brief',fields:[{id:'name',type:'text',label:'Project',required:true},{id:'details',type:'rich',label:'Details'},{id:'approved',type:'yesno',label:'Approved?'},{id:'due',type:'date',label:'Due date'},{id:'category',type:'select',label:'Category',options:['A','B']}]});
+const form=await create();const edited=await service.call('edit_form',{artifact_id:form.artifact_id,operations:[{op:'add',field:{id:'section',type:'heading',label:'Context'},position:0},{op:'update',field_id:'name',changes:{label:'Project name'}},{op:'move',field_id:'due',position:2},{op:'remove',field_id:'category'}]});
+assert.equal((await store.getRecord(form.artifact_id)).document.schema.fields.length,5);assert.equal((await store.getRecord(edited.artifact_id)).document.schema.fields[0].type,'heading');
+let draft=await service.call('save_draft',{artifact_id:edited.artifact_id,answers:{}});assert.equal(draft.validation.valid,false);await assert.rejects(service.call('export_document',{artifact_id:draft.artifact_id,format:'pdf'}),/Complete/);
+draft=await service.call('save_draft',{artifact_id:draft.artifact_id,answers:{name:'MCP end-to-end test',details:'<p>Hello <strong>bold</strong> and <em>italic</em>.</p><ul><li>First</li></ul>',approved:'Yes',due:'2026-11-01'}});
+draft=await service.call('attach_image',{artifact_id:draft.artifact_id,field_id:'details',image_data_url:png});assert.equal((await service.call('validate_draft',{artifact_id:draft.artifact_id})).valid,true);
+const redacted=await service.call('get_form',{artifact_id:draft.artifact_id});assert.equal(redacted.redacted_images,1);assert.ok(!JSON.stringify(redacted).includes('iVBOR'));
+for(const format of ['pdf','docx']){const file=await service.call('export_document',{artifact_id:draft.artifact_id,format});const bytes=await fs.readFile(file.file_path);if(format==='pdf')assert.equal(bytes.subarray(0,4).toString(),'%PDF');else{const zip=await JSZip.loadAsync(bytes);assert.match(await zip.file('word/document.xml').async('string'),/MCP end-to-end test/);assert.equal(Object.keys(zip.files).filter(n=>n.startsWith('word/media/')&&n.endsWith('.png')).length,1);}}
+for(const format of ['html','zip']){const file=await service.call('export_form',{artifact_id:draft.artifact_id,format});const bytes=await fs.readFile(file.file_path),html=format==='html'?bytes.toString():await (await JSZip.loadAsync(bytes)).file('index.html').async('string');assert.match(html,/"locked":true/);assert.ok(!html.includes('MCP end-to-end test'));assert.ok(!html.match(/<script[^>]+src=/));}
+assert.equal(cleanRich('<p onclick="alert(1)">Safe</p><script>evil()</script>'),'<p>Safe</p>');assert.throws(()=>cleanRich('<img src="https://example.com/a.png">'),/embedded/);assert.throws(()=>imageData('data:image/png;base64,AAAA'),/Invalid/);
+await assert.rejects(service.call('create_form',{title:'x',fields:[{id:'a',type:'text',label:'a'},{id:'a',type:'text',label:'b'}]}),/unique/);
+await assert.rejects(service.call('get_form',{artifact_id:'../secret'}));await assert.rejects(store.importBytes('../secret'));
+const invalid=await service.call('save_draft',{artifact_id:draft.artifact_id,answers:{due:'2026-02-30',approved:'Maybe'}});assert.equal(invalid.validation.errors.length,2);
+const reimport=await service.call('import_document',{document:(await store.getRecord(draft.artifact_id)).document});assert.equal((await store.getRecord(reimport.artifact_id)).document.answers.details,(await store.getRecord(draft.artifact_id)).document.answers.details);
+assert.ok((await service.call('list_forms',{limit:2})).next_cursor);
+// Exercise a genuine MCP client against the distributable local bundle.
+const client=new Client({name:'form-studio-test',version:'1.0.0'});const transport=new StdioClientTransport({command:process.execPath,args:[path.resolve('local-mcp/server.mjs'),'--data-dir',path.join(root,'stdio')],stderr:'pipe'});let stderr='';transport.stderr?.on('data',c=>stderr+=c.toString());
+try{await client.connect(transport);const list=await client.listTools();assert.equal(list.tools.length,12);const result=await client.callTool({name:'create_form',arguments:{title:'Through MCP',fields:[{id:'name',type:'text',label:'Name'}]}});assert.ok(!result.isError,JSON.stringify(result));const data=result.structuredContent||JSON.parse(result.content[0].text);assert.ok(data.artifact_id);const got=await client.callTool({name:'get_form',arguments:{artifact_id:data.artifact_id}});assert.ok(!got.isError);const bad=await client.callTool({name:'get_form',arguments:{artifact_id:'../../secrets'}});assert.equal(bad.isError,true);const resources=await client.listResources();assert.equal(resources.resources[0].uri,'form-studio://guide');}finally{await client.close();}
+// Verify the exact hosted bundle with an R2-compatible in-memory store.
+class MemoryBucket{data=new Map();async put(key,value,opts){const bytes=typeof value==='string'?new TextEncoder().encode(value):value;this.data.set(key,{bytes,...opts});}async get(key){const x=this.data.get(key);return x?{...x,body:x.bytes,text:async()=>new TextDecoder().decode(x.bytes)}:null;}async list({prefix,limit,cursor}){const all=[...this.data].filter(([key])=>key.startsWith(prefix)),start=Number(cursor||0);return {objects:all.slice(start,start+limit).map(([key,x])=>({key,customMetadata:x.customMetadata})),truncated:start+limit<all.length,cursor:String(start+limit)};}}
+const source=await fs.readFile('dist/server/index.js','utf8'),worker=(await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'))).default,bucket=new MemoryBucket();
+async function post(body,user='alice',origin){return worker.fetch(new Request('https://forms.example/mcp',{method:'POST',headers:{'content-type':'application/json',...(user?{'oai-authenticated-user-id':user}:{}),...(origin?{origin}:{})},body:JSON.stringify(body)}),{BUCKET:bucket});}
+const request=(method,params)=>({jsonrpc:'2.0',id:1,method,params});
+assert.deepEqual((await (await post(request('server/discover'))).json()).result.supportedVersions,['2026-07-28']);assert.equal((await (await post(request('tools/list'))).json()).result.tools.length,10);
+assert.equal((await post(request('tools/call',{name:'list_forms',arguments:{}}),null)).status,401);assert.equal((await post(request('tools/list'),null,'https://evil.example')).status,403);
+const created=(await (await post(request('tools/call',{name:'create_form',arguments:{title:'Online form',fields:[{id:'name',type:'text',label:'Name',required:true}]}}))).json()).result;assert.ok(!created.isError,JSON.stringify(created));const onlineId=created.structuredContent.artifact_id;
+const other=(await (await post(request('tools/call',{name:'get_form',arguments:{artifact_id:onlineId}}),'bob')).json()).result;assert.equal(other.isError,true);
+const saved=(await (await post(request('tools/call',{name:'save_draft',arguments:{artifact_id:onlineId,answers:{name:'Online export'}}}))).json()).result;assert.ok(!saved.isError,JSON.stringify(saved));
+for(const format of ['pdf','docx']){const exported=(await (await post(request('tools/call',{name:'export_document',arguments:{artifact_id:saved.structuredContent.artifact_id,format}}))).json()).result;assert.ok(!exported.isError,JSON.stringify(exported));const url=exported.structuredContent.download_url;assert.equal((await worker.fetch(new Request(url),{BUCKET:bucket})).status,401);const file=await worker.fetch(new Request(url,{headers:{'oai-authenticated-user-id':'alice'}}),{BUCKET:bucket});assert.equal(file.status,200);assert.ok((await file.arrayBuffer()).byteLength>500);const wrong=await worker.fetch(new Request(url,{headers:{'oai-authenticated-user-id':'bob'}}),{BUCKET:bucket});assert.equal(wrong.status,404);}
+console.log('PASS: MCP stdio negotiation and 12 tools; hosted discovery and 10 tools; form versions, editing, draft validation, image embedding, Word/PDF/HTML/ZIP exports, import round-trip, input rejection, private download access, and cross-user isolation.');

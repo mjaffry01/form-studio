@@ -1,0 +1,28 @@
+import { definitions,portableDocument } from './schema.mjs';
+import { normalizeForm,normalizeAnswers,validateDraft,imageData,escapeHTML } from './content.mjs';
+import { exportDocument,exportForm } from './export.mjs';
+
+const id=()=>crypto.randomUUID();
+const clone=x=>JSON.parse(JSON.stringify(x));
+const filename=(title,ext)=>(title.replace(/[^\p{L}\p{N}\s_-]/gu,'').trim().slice(0,70)||'form')+'.'+ext;
+const newField=f=>({id:'f'+id(),...f});
+export function createService(store,template){
+ const describe=record=>({artifact_id:record.id,kind:record.kind,title:record.document.schema.title,parent_id:record.parent_id||null,created_at:record.created_at,...store.recordLink(record)});
+ async function save(document,parent_id){const schema=normalizeForm(document.schema);const normalized={format:document.format,version:1,schema,...(document.format==='form-studio-draft'?{answers:normalizeAnswers(schema,document.answers)}:{})};const record={id:id(),kind:document.format==='form-studio-draft'?'draft':'design',created_at:new Date().toISOString(),parent_id:parent_id||null,document:normalized};await store.putRecord(record);return {...describe(record),fields:schema.fields.map(f=>({id:f.id,label:f.label,type:f.type})),...(record.kind==='draft'?{validation:validateDraft(normalized)}:{})};}
+ async function draft(artifact_id){const record=await store.getRecord(artifact_id);if(record.kind!=='draft')throw new Error('This is a design. Use save_draft to add responses first.');return record;}
+ async function call(name,raw){const def=definitions.find(d=>d.name===name);if(!def)throw new Error('Unknown tool.');const a=def.schema.parse(raw||{});
+  if(name==='list_forms')return store.list(a);
+  if(name==='get_form'){const record=await store.getRecord(a.artifact_id),document=clone(record.document);let redacted_images=0;if(!a.include_images&&document.answers)for(const f of document.schema.fields)if(f.type==='rich'&&document.answers[f.id])document.answers[f.id]=document.answers[f.id].replace(/src="data:image\/(?:png|jpeg);base64,[^"]+"/g,()=>`src="embedded:image-${++redacted_images}"`);return {...describe(record),document,redacted_images,...(redacted_images?{note:'Image data is redacted. Do not re-import this redacted document. Use the download link or include_images:true for the original.'}:{})};}
+  if(name==='create_form'){return save({format:'form-studio-design',version:1,schema:{id:'f'+id(),title:a.title,description:a.description,fields:a.fields.map(newField)}});}
+  if(name==='edit_form'){const record=await store.getRecord(a.artifact_id);if(record.kind!=='design')throw new Error('edit_form requires a design artifact.');const document=clone(record.document),s=document.schema;if(a.title!==undefined)s.title=a.title;if(a.description!==undefined)s.description=a.description;for(const op of a.operations){if(op.op==='add'){const at=op.position??s.fields.length;if(at>s.fields.length)throw new Error('Add position is out of range.');s.fields.splice(at,0,newField(op.field));continue;}const at=s.fields.findIndex(f=>f.id===op.field_id);if(at<0)throw new Error('Field ID was not found.');if(op.op==='remove')s.fields.splice(at,1);if(op.op==='update')Object.assign(s.fields[at],op.changes);if(op.op==='move'){if(op.position>=s.fields.length)throw new Error('Move position is out of range.');const [f]=s.fields.splice(at,1);s.fields.splice(op.position,0,f);}}return save(document,record.id);}
+  if(name==='save_draft'){const record=await store.getRecord(a.artifact_id);return save({format:'form-studio-draft',version:1,schema:record.document.schema,answers:{...(record.document.answers||{}),...a.answers}},record.id);}
+  if(name==='attach_image'){const record=await draft(a.artifact_id),document=clone(record.document),field=document.schema.fields.find(f=>f.id===a.field_id);if(field?.type!=='rich')throw new Error('Choose a Text + images (rich) field.');imageData(a.image_data_url);document.answers[field.id]=(document.answers[field.id]||'')+`<p><img src="${escapeHTML(a.image_data_url)}" alt="${escapeHTML(a.alt)}"></p>`;return save(document,record.id);}
+  if(name==='validate_draft')return validateDraft((await draft(a.artifact_id)).document);
+  if(name==='export_document'){const record=await draft(a.artifact_id),validation=validateDraft(record.document);if(!validation.valid)throw new Error('Complete or correct these fields before exporting: '+validation.errors.map(e=>`${e.label}: ${e.message}`).join('; '));const bytes=await exportDocument(record.document,a.format),mime=a.format==='pdf'?'application/pdf':'application/vnd.openxmlformats-officedocument.wordprocessingml.document';return store.putExport({id:id(),name:filename(record.document.schema.title,a.format),mime,bytes,source_id:record.id});}
+  if(name==='export_form'){const record=await store.getRecord(a.artifact_id),bytes=await exportForm(template,record.document.schema,a.format);return store.putExport({id:id(),name:filename(record.document.schema.title,a.format),mime:a.format==='zip'?'application/zip':'text/html',bytes,source_id:record.id});}
+  if(name==='import_document'){const document=portableDocument.parse(a.document);return save(document);}
+ }
+ return {call,describe};
+}
+export function toolResult(data){const content=[{type:'text',text:JSON.stringify(data)}];if(data.download_url)content.push({type:'resource_link',uri:data.download_url,name:data.name||data.title||'Form Studio file',mimeType:data.mime_type||'application/json'});return {content,structuredContent:data};}
+export function toolError(error){return {isError:true,content:[{type:'text',text:error?.issues?error.issues.map(i=>`${i.path.join('.')}: ${i.message}`).join('; '):String(error?.message||error)}]};}

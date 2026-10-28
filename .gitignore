@@ -1,0 +1,13 @@
+node_modules/
+*.tar.gz
+*.tar
+test-results/
+local-mcp/
+mcp/data/
+
+dist/
+outputs/
+.env
+.env.*
+!.env.example
+*.log

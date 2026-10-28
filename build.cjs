@@ -1,0 +1,5 @@
+const fs=require('fs');const path=require('path');
+const files={BOOTSTRAP:'node_modules/bootstrap/dist/css/bootstrap.min.css',STYLES:'styles.css',PURIFY:'node_modules/dompurify/dist/purify.min.js',JSZIP:'node_modules/jszip/dist/jszip.min.js',DOCX:'node_modules/docx/dist/index.umd.cjs',PDFMAKE:'node_modules/pdfmake/build/pdfmake.min.js',FONTS:'node_modules/pdfmake/build/vfs_fonts.js',APP:'app.js'};
+let html=fs.readFileSync('index.template.html','utf8');
+for(const [key,file] of Object.entries(files)){let s=fs.readFileSync(file,'utf8').replace(/\/\/# sourceMappingURL=.*$/gm,'').replace(/\/\*# sourceMappingURL=.*?\*\//gs,'');if(key==='APP')s=s.replace('/*MCP_CLIENT*/',()=>fs.readFileSync('mcp/client.js','utf8'));if(!['BOOTSTRAP','STYLES'].includes(key))s=s.replace(/<\/script/gi,'<\\/script');html=html.replace('/*'+key+'*/',()=>s);}
+fs.mkdirSync('dist',{recursive:true});fs.writeFileSync('dist/index.html',html);console.log('Built self-contained app: '+(Buffer.byteLength(html)/1024/1024).toFixed(2)+' MB');
