@@ -72,3 +72,7 @@ Submit means validate and review for document export. The offline version keeps 
 Install Node.js, run `npm ci`, then `npm run build`. `npm start` serves the app at `http://127.0.0.1:4173`. `npm test` checks the main editing workflow, required validation, draft restoration, sanitization, standalone packaging, and image-containing Word/PDF generation. The generated app is `dist/index.html`.
 
 Dependencies are pinned in `package-lock.json`. Third-party license notices are distributed with the offline package. The offline application has no analytics or runtime network calls. The hosted MCP library uses authenticated requests and private server storage.
+
+## Guided tour
+
+Choose **Take a tour** at the top of the app. Use Next and Back, or Skip tour (Escape also closes it). The tour uses a separate example and restores your own form when it ends. Downloaded recipient forms have a shorter tour for filling, saving drafts, and exporting.

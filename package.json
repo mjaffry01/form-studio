@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node build.cjs && node mcp/build.mjs",
     "start": "node server.cjs",
-    "test": "node tests.cjs && node mcp/tests.mjs",
+    "test": "node tests.cjs && node tour-tests.cjs && node mcp/tests.mjs",
     "mcp": "node mcp/local.mjs"
   },
   "dependencies": {
