@@ -15,11 +15,16 @@ In the web app, **Save to library** stores a design in Design mode, or a respons
 1. Extract the local ZIP into a permanent folder.
 2. Install Node.js 20 or later if needed. Node is already installed on the computer used to build this server.
 3. Run `node setup-config.mjs` in that folder. It creates `client-config.json` with the right paths and does not change application settings.
-4. Add that server entry to an MCP client that supports local stdio. The client launches the server automatically; do not launch it separately.
+4. Add that server entry to an MCP client that supports local stdio. The client launches the MCP server automatically.
+5. Double-click **Start-Local.cmd** on Windows to open the connected local app. Alternatively run `node server.mjs --web --open` on Windows, macOS, or Linux. Keep the server window open while using the app.
+
+The local app opens at **http://127.0.0.1:4174** with **MCP library** and **Save to library**. It shares the `data` folder with the local MCP client, so both see the same saved versions. Save in Design mode to keep a design, or in Fill in/Export mode to keep answers and images. No internet connection or online sign-in is required. Opening `Form-Studio.html` directly still gives the standalone editor without a connected library.
+
+For a custom library, pass `--data-dir` with the same folder configured for your MCP client (or set `FORM_STUDIO_DATA_DIR` for both). If port 4174 is busy, use `--port 4175` and open the printed address. Stop the local app with Ctrl+C. Starting it again keeps saved records. The online library stays separate.
 
 The configuration uses the common `mcpServers` JSON format. Clients with other settings formats should use the same command, arguments, and environment variable. No npm installation is needed for the bundled server.
 
-A `data` folder is created beside the server. `FORM_STUDIO_DATA_DIR` overrides its location. `records` holds app-compatible JSON designs/drafts and metadata; `exports` holds generated files; `imports` holds files you explicitly supply to the import tools. The server has no network listener. File-import tools accept only filenames inside the imports folder.
+A `data` folder is created beside the server. `FORM_STUDIO_DATA_DIR` overrides its location. `records` holds app-compatible JSON designs/drafts and metadata; `exports` holds generated files; `imports` holds files you explicitly supply to the import tools. The stdio MCP mode has no network listener. The `--web` mode listens only on this computer (127.0.0.1) and validates the local host, browser origin, and a fresh session token. File-import tools accept only filenames inside the imports folder.
 
 ## Tools
 

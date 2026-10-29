@@ -76,3 +76,7 @@ Dependencies are pinned in `package-lock.json`. Third-party license notices are 
 ## Guided tour
 
 Choose **Take a tour** at the top of the app. Use Next and Back, or Skip tour (Escape also closes it). The tour uses a separate example and restores your own form when it ends. Downloaded recipient forms have a shorter tour for filling, saving drafts, and exporting.
+
+## Connected local library
+
+Extract the local MCP package and run **Start-Local.cmd** on Windows (Node.js 20+ required), or run `node server.mjs --web --open`. The local app has MCP library and Save to library, sharing saved versions with your local MCP client. Keep the server running. From source, use `npm run local` after building. See mcp/README.md for custom data folders and ports.

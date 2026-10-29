@@ -6,8 +6,9 @@
   "scripts": {
     "build": "node build.cjs && node mcp/build.mjs",
     "start": "node server.cjs",
-    "test": "node tests.cjs && node tour-tests.cjs && node mcp/tests.mjs",
-    "mcp": "node mcp/local.mjs"
+    "test": "node tests.cjs && node tour-tests.cjs && node mcp/tests.mjs && node mcp/local-web-tests.mjs",
+    "mcp": "node mcp/local.mjs",
+    "local": "node mcp/local.mjs --web --open"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.4.0",
