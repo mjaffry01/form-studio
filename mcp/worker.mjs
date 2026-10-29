@@ -14,7 +14,7 @@ export default {async fetch(request,env){
  const origin=request.headers.get('origin');
  if(origin&&origin!==url.origin)return json({error:'Cross-origin requests are not allowed.'},403);
  if(url.pathname==='/health')return json({ok:true,name:info.name,version:info.version});
- if(url.pathname==='/'&&request.method==='GET')return new Response(template.replace('<script id="form-config" type="application/json">{"locked":false}</script>','<script id="form-config" type="application/json">{"locked":false,"mcpEnabled":true}</script>'),{headers:{...headers,'content-type':'text/html; charset=utf-8'}});
+ if(url.pathname==='/'&&request.method==='GET')return new Response(template.replace('<script id="form-config" type="application/json">{"locked":false}</script>',`<script id="form-config" type="application/json">${JSON.stringify({locked:false,mcpEnabled:true,signedIn:!!user})}</script>`),{headers:{...headers,'content-type':'text/html; charset=utf-8'}});
  if(url.pathname==='/mcp'){
   if(request.method!=='POST')return new Response(null,{status:405,headers:{...headers,Allow:'POST'}});
   if(!request.headers.get('content-type')?.includes('application/json'))return json({error:'Use application/json.'},415);
